@@ -3,10 +3,8 @@ use std::io::{self, Read, Seek, SeekFrom, Write as _};
 use std::mem;
 use std::path::PathBuf;
 
-use anvil::Region;
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use regex::Regex;
 
 use crate::commands::{CommandContext, Run};
 
@@ -31,23 +29,10 @@ impl Run for LastUpdateArgs {
     fn run(self, ctx: CommandContext) -> anyhow::Result<()> {
         let input = ctx.directory.join(self.input);
         let path = fs::canonicalize(input).context("failed to canonicalize input")?;
-
-        // let file_name = path
-        //     .file_name()
-        //     .and_then(|f| f.to_str())
-        //     .context("file name contains invalid Unicode")?;
-
-        // // Chunk coordinates in the file are relative to the region. Since the region's coordinates
-        // // are derived from the filename, validate the filename before opening the file so we
-        // // can determine each chunk's position in the world.
-        // let region = parse_input_file_name(file_name).context("failed to parse file name")?;
-
         let file = File::open(&path).context("failed to open file")?;
         let chunks = parse_chunks(file).context("failed to get chunk information")?;
 
         for chunk in chunks {
-            // let x = (region.x() * 32) + i64::from(chunk.relative_x);
-            // let z = (region.z() * 32) + i64::from(chunk.relative_z);
             let x = chunk.relative_x;
             let z = chunk.relative_z;
 
@@ -58,19 +43,6 @@ impl Run for LastUpdateArgs {
 
         Ok(())
     }
-}
-
-#[expect(dead_code, reason = "separate python script")]
-fn parse_input_file_name(file_name: &str) -> anyhow::Result<Region> {
-    let pattern = Regex::new(r"^r\.(-?\d+)\.(-?\d+)\.mca$")?;
-    let captures = pattern
-        .captures(file_name)
-        .context("file name does not match format: r.<x>.<z>.mca")?;
-
-    let x = captures[1].parse::<i64>().unwrap();
-    let z = captures[2].parse::<i64>().unwrap();
-
-    Ok(Region::new(x, z))
 }
 
 fn parse_chunks<R>(mut reader: R) -> anyhow::Result<Vec<LastUpdate>>
