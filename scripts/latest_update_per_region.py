@@ -24,7 +24,7 @@ class Entry(NamedTuple):
     timestamp: datetime.datetime
 
     def to_row(self) -> str:
-        return f"{self.region_x},{self.region_z},{self.chunk_x},{self.chunk_z},{self.block_x},{self.block_z},{self.timestamp}"  # noqa: E501
+        return f"{self.region_x},{self.region_z},{self.chunk_x},{self.chunk_z},{self.block_x},{self.block_z},{self.timestamp.isoformat()}"  # noqa: E501
 
 
 def main() -> None:
@@ -53,7 +53,6 @@ def main() -> None:
 
         for line in lines:
             chunk_coordinates, timestamp_raw = line.split(": ", maxsplit=1)
-
             x_chunk_raw, z_chunk_raw = chunk_coordinates.split(",", maxsplit=1)
 
             # Calculate the chunk's position within the Minecraft world.
