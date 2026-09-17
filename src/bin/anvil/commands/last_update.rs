@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom, Write as _};
 use std::mem;
 use std::path::PathBuf;
@@ -28,24 +28,22 @@ struct LastUpdate {
 impl Run for LastUpdateArgs {
     fn run(self, ctx: CommandContext) -> anyhow::Result<()> {
         let input = ctx.directory.join(self.input);
-        let path = fs::canonicalize(input).context("failed to canonicalize input")?;
-        let file = File::open(&path).context("failed to open file")?;
-        let chunks = parse_chunks(file).context("failed to get chunk information")?;
+        let file = File::open(&input).context("failed to open file")?;
+        let chunks = parse_timestamps(file).context("failed to get chunk information")?;
 
         for chunk in chunks {
             let x = chunk.relative_x;
             let z = chunk.relative_z;
+            let timestamp = chunk.timestamp.to_rfc3339();
 
-            writeln!(io::stdout(), "{x},{z}: {}", chunk.timestamp.to_rfc3339()).ok();
+            writeln!(io::stdout(), "{x},{z}: {timestamp}").ok();
         }
-
-        writeln!(io::stderr(), "Done!").ok();
 
         Ok(())
     }
 }
 
-fn parse_chunks<R>(mut reader: R) -> anyhow::Result<Vec<LastUpdate>>
+fn parse_timestamps<R>(mut reader: R) -> anyhow::Result<Vec<LastUpdate>>
 where
     R: Read + Seek,
 {
@@ -53,6 +51,7 @@ where
     // table for the chunks and the second contains timestamps for the last update of said chunks.
     //
     // Both tables have 1024 entries. Each entry is a big-endian, 32-bit integer.
+
     seek_to_timestamp_table(&mut reader).context("failed to seek to timestamp table")?;
 
     let mut buffer = vec![0u8; TABLE_SIZE * ENTRY_SIZE];
@@ -60,11 +59,10 @@ where
         .read_exact(&mut buffer)
         .context("failed to read timestamp entries")?;
 
-    debug_assert!(buffer.len().is_multiple_of(ENTRY_SIZE));
     let (entries, remainder) = buffer.as_chunks::<ENTRY_SIZE>();
-    debug_assert!(remainder.is_empty());
+    assert!(remainder.is_empty());
 
-    let mut chunks = Vec::with_capacity(TABLE_SIZE);
+    let mut timestamps = Vec::with_capacity(TABLE_SIZE);
 
     for (index, bytes) in entries.iter().copied().enumerate() {
         let seconds = u32::from_be_bytes(bytes);
@@ -79,14 +77,14 @@ where
         let relative_x = u8::try_from(index % 32).unwrap();
         let relative_z = u8::try_from(index / 32).unwrap();
 
-        chunks.push(LastUpdate {
+        timestamps.push(LastUpdate {
             relative_x,
             relative_z,
             timestamp,
         });
     }
 
-    Ok(chunks)
+    Ok(timestamps)
 }
 
 fn seek_to_timestamp_table<R>(reader: &mut R) -> Result<u64, io::Error>
